@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 """Sandbox"""
 
+#%%
+# re-compress o3 files
+# import os
+# import zipfile
+
+# localpath = os.path.expanduser("~/Desktop/06")
+
+# for root, dirs, files in os.walk(localpath):
+#     for fname in files:
+#         archive = os.path.join(root, "".join([fname[:-3], "zip"]))
+#         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as fh:
+#             fh.write(os.path.join(root, fname), fname)
+
+
 # %%
 import matplotlib as plt
 
@@ -40,22 +54,11 @@ def plot_df(df, title, yaxs=None, ylabs=None, path=None):
             fig.savefig('%s.svg' % path, transparent=True)
             fig.savefig('%s.png' % path, dpi=300, transparent=True)
             print("Figure saved to '%s'" % path)
-
     except Exception as err:
         print(err)
 
-
-
 # %%
-# specify root path
-ebas = "~/Documents/git/scratch/data/ebas"
-
-# file = 'C:/Users/localadmin/Documents/git/scratch/data/ebas/aerosol/KE0001G.20150101000000.20160321124934.nephelometer..aerosol.1y.1h.CH02L_Ecotech_Aurora3000_TLL_dry.CH02L_scat_coef.lev2.nas'
-
-df.plot(x='dtm', y='O3_ug_m-3', title='[MKN] Surface Ozone')
-
-# %%
-plot_df(df=df, title='[MKN] Surface Ozone')
+# plot_df(df=df, title='[MKN] Surface Ozone')
 # fig, axs = plt.subplots(3, 1, figsize=(6.4, 7), constrained_layout=True)
 # # common to all three:
 # for ax in axs:
@@ -64,7 +67,7 @@ plot_df(df=df, title='[MKN] Surface Ozone')
 #     ax.xaxis.set_major_locator(mdates.MonthLocator(bymonth=(1, 7)))
 #     ax.xaxis.set_minor_locator(mdates.MonthLocator())
 #     ax.grid(True)
-#     ax.set_ylabel(r'Price [\$]')
+#     ax.set_ylabel(r'Price [/$]')
 
 # # different formats:
 # ax = axs[0]
@@ -88,7 +91,15 @@ plot_df(df=df, title='[MKN] Surface Ozone')
 
 
 # %%
-file = "C:/Users/localadmin/Documents/git/scratch/data/ebas/o3/data.pkl"
-data = pd.read_pickle(file)
+# file = "C:/Users/localadmin/Documents/git/scratch/data/ebas/o3/data.pkl"
+# data = pd.read_pickle(file)
 # plot data
-data['df'].plot(x='dtm', y='O3_2')
+# data['df'].plot(x='dtm', y='O3_2')
+
+# %%
+# specify root path
+# ebas = "~/Documents/git/scratch/data/ebas"
+
+# file = 'C:/Users/localadmin/Documents/git/scratch/data/ebas/aerosol/KE0001G.20150101000000.20160321124934.nephelometer..aerosol.1y.1h.CH02L_Ecotech_Aurora3000_TLL_dry.CH02L_scat_coef.lev2.nas'
+
+# df.plot(x='dtm', y='O3_ug_m-3', title='[MKN] Surface Ozone')
