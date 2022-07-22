@@ -3,15 +3,17 @@
 # %%
 import os
 from datetime import datetime
-from dateutil. relativedelta import relativedelta
+import zipfile
 import sqlite3
+import tarfile
+from dateutil. relativedelta import relativedelta
 import pandas as pd
 import requests
-import tarfile
 
 
 # %%
-def download_shadoz_tars(base_url: str, target_dir: str, begin_date: datetime, end_date=None, file_type="sfco3") -> list:  
+def download_archives(base_url: str, target_dir: str,
+    begin_date: datetime, end_date=None, file_type="sfco3") -> list:
     if not end_date:
         end_date = datetime.today()
     if file_type not in ['sfco3', 'V06']:
@@ -20,35 +22,42 @@ def download_shadoz_tars(base_url: str, target_dir: str, begin_date: datetime, e
         flist = []
         dtm = begin_date
         while dtm < end_date:
-            fname = f"nairobi_{file_type}_{dtm.strftime('%Y%m')}.tar"
-            url = "".join([base_url, fname])
-            print(f"Downloading {url} ... ", end="")
-            res = requests.get(url, allow_redirects=True)
-            if res.ok:
-                fpath = os.path.join(target_dir, fname)
-                os.makedirs(os.path.dirname(fpath), exist_ok=True)
-                print(f"ok.\nSaving to {fpath}")
-                open(fpath, 'wb').write(res.content)
-                flist.append(fpath)
-            else:
-                print("failed.")
-            dtm = dtm + relativedelta(months=1)
+            if file_type == 'sfco3':
+                fname = f"nairobi_{file_type}_{dtm.strftime('%Y%m')}"
+                months = 1
+            elif file_type == 'V06':
+                fname = f"shadoz_nairobi_{dtm.strftime('%Y')}_{file_type}"
+                months = 12
+            for ext in (".tar", ".zip"):
+                url = "".join([base_url, fname, ext])
+                print(f"Downloading {url} ... ", end="")
+                res = requests.get(url, allow_redirects=True)
+                if res.ok:
+                    fpath = os.path.join(target_dir, "".join([fname, ext]))
+                    os.makedirs(os.path.dirname(fpath), exist_ok=True)
+                    print(f"ok.\nSaving to {fpath}")
+                    open(fpath, 'wb').write(res.content)
+                    flist.append(fpath)
+                else:
+                    print("failed.")
+            dtm = dtm + relativedelta(months=months)
         print("done.")
-        
+
         return flist
 
     except Exception as err:
         print(err)
 
 # %%
-def extract_shadoz_tar(fpath: str, include=[".txt"]) -> list:
+def extract_archive(fpath: str, include=None) -> list:
     try:
+        if not include:
+            include = [".txt", ".dat"]
+        flist = []
+        fname = os.path.basename(fpath)
+        print(f"Processing {fname} ...")
         if ".tar" in fpath:
-            flist = []
-            fname = os.path.basename(fpath)
-            print(f"Processing {fname} ...")
             tar = tarfile.open(fpath)
-            # members = tar.getmembers()
             for member in tar:
                 if member.name[-4:] in include:
                     print(f" - Extracting {member.name} ...")
@@ -56,33 +65,55 @@ def extract_shadoz_tar(fpath: str, include=[".txt"]) -> list:
                     tar.extract(member, os.path.dirname(fpath))
                     flist.append(os.path.join(os.path.dirname(fpath), member.name))
             tar.close()
+        elif ".zip" in fpath:
+            with zipfile.ZipFile(fpath, 'r') as zfh:
+                for fname in zfh.namelist():
+                    print(fname)
+                    if fname[-4:] in include:
+                        zfh.extract(fname, os.path.dirname(fpath))
+                        flist.append(os.path.join(os.path.dirname(fpath), fname))
         print('done.')
         return flist
     except Exception as err:
         print(err)
 
 # %%
-def extract_shadoz_sfco3_file(fpath: str, remove_file=False) -> pd.DataFrame:
+def extract_shadoz_file(fpath: str, remove_file=False) -> pd.DataFrame:
     try:
         # read file and determine number of header rows, file type
         with open(fpath, 'r', encoding='utf') as fh:
             data = fh.readlines()
         header_rows = int(data[0])
-        shadoz_data_type = data[1]
-        if "Surface Ozone Measurements" in shadoz_data_type:
-            df = pd.read_csv(fpath, sep="\s", header=None, 
-                skiprows=header_rows, parse_dates=[[0, 1]], 
+        shadoz_data_type = data[4].split(sep=": ")[1]
+        if "01" in shadoz_data_type:
+            df = pd.read_csv(fpath, sep=r"\s+", header=None,
+                skiprows=header_rows, parse_dates=[[0, 1]],
                 index_col=[0], engine="python")
             df.index.rename('dtm', inplace=True)
             df.rename(columns={2: "O3_ppb"}, inplace=True)
             df.reset_index()
+        elif "06" in shadoz_data_type:
+            launch_dtm = f"{data[12].split(sep=': ')[1].split()[0]} \
+                {data[13].split(sep=': ')[1].split()[0]}"
+            launch_dtm = datetime.strptime(launch_dtm, "%Y%m%d %H:%M:%S")
+            names = data[header_rows - 2].split()
+            units = data[header_rows - 1].split()
+            df = pd.read_csv(fpath, sep=r"\s+", header=None,
+                skiprows=header_rows, parse_dates=None,
+                na_values=['9000.0', '9000.00', '9000.000', '9000.00000'],
+                index_col=None, engine="python")
+            # df.columns = [f"{x}_{y}" for x, y in zip(names, units)]
+            df.columns = names
+            df['dtm'] = launch_dtm + pd.to_timedelta(df['Time'], unit="s")
+            df.set_index('dtm', inplace=True)
+            df.reset_index()
+        else:
+            raise ValueError(f"Cannot read file of type {shadoz_data_type}")
 
-            
+        if remove_file:
             os.remove(fpath)
 
-            return df
-        else:
-            return pd.DataFrame()
+        return df
 
     except Exception as err:
         print(err)
@@ -96,13 +127,17 @@ def append_to_sqlite_db(df: pd.DataFrame, db: str, tbl: str, remove_duplicates=T
 
         records_for_insert = len(df)
 
-        con = sqlite3.connect(db)        
+        con = sqlite3.connect(db)
 
         qry_count_records = f"SELECT count({df.index.name}) from {tbl}"
-        records_before_insert = con.execute(qry_count_records).fetchone()[0]
+        try:
+            records_before_insert = con.execute(qry_count_records).fetchone()[0]
+        except:
+            # table does not exist yet
+            records_before_insert = 0
 
         print(f"Inserting {records_for_insert} rows to {db}[{tbl}] ...")
-        df.to_sql(name=tbl, con=con, if_exists="append")
+        df.to_sql(name=tbl, con=con, if_exists="append", )
         records_after_insert = con.execute(qry_count_records).fetchone()[0]
 
         if (records_after_insert - records_before_insert) < records_for_insert:
@@ -110,10 +145,15 @@ def append_to_sqlite_db(df: pd.DataFrame, db: str, tbl: str, remove_duplicates=T
 
         if remove_duplicates:
             group_by = ", ".join(list(df.index.names) + list(df.columns))
-            qry = f"DELETE FROM {tbl} WHERE ROWID NOT IN (SELECT min(ROWID) FROM {tbl} GROUP BY {group_by})"
+            qry = f"DELETE FROM {tbl} WHERE ROWID NOT IN (SELECT min(ROWID) \
+                FROM {tbl} GROUP BY {group_by})"
+            con.execute(qry)
+            con.commit()
             records_after_deduplication = con.execute(qry_count_records).fetchone()[0]
 
-        res = {"records_inserted": records_for_insert, 
+        con.close()
+
+        res = {"records_inserted": records_for_insert, \
             "duplicate_records": records_after_insert - records_after_deduplication}
 
         return res
@@ -122,38 +162,68 @@ def append_to_sqlite_db(df: pd.DataFrame, db: str, tbl: str, remove_duplicates=T
 
 
 # %%
-root_url = "https://acd-ext.gsfc.nasa.gov/anonftp/acd"
-source = "shadoz"
-station = "nairobi"
-file_type="sfco3"
+ROOT_URL = "https://acd-ext.gsfc.nasa.gov/anonftp/acd"
+SOURCE = "shadoz"
+STATION = "nairobi"
+ROOT = os.path.expanduser("~/Documents/git/scratch/data")
 
-root = os.path.expanduser("~/Documents/git/scratch/data")
-
-target_dir = os.path.join(root, source, file_type)
-os.makedirs(target_dir, exist_ok=True)
-
-# %%
+# %% Surface ozone data NRB
 # download data from SHADOZ repository
-base_url = f"{root_url}/{source}/{file_type.upper()}/{station}/"
+FILE_TYPE="sfco3"
+
 begin_date = datetime(2012, 6, 1)
 end_date = datetime(2022, 6, 30)
+base_url = f"{ROOT_URL}/{SOURCE}/{FILE_TYPE.upper()}/{STATION}/"
+target_dir = os.path.join(ROOT, SOURCE, FILE_TYPE)
+os.makedirs(target_dir, exist_ok=True)
 
-tars = download_shadoz_tars(base_url, target_dir, begin_date, end_date=end_date, file_type=file_type)
+archives = []
+for root, dnames, fnames in os.walk(target_dir):
+    for fname in fnames:
+        archives.append(os.path.join(root, fname))
+
+if not archives:
+    archives = download_archives(base_url, target_dir, \
+        begin_date, end_date=end_date, file_type=FILE_TYPE)
 
 # %%
 # process tar archives, add data to sqlite db
-db = os.path.join(root, "data.sqlite")
-for fpath in tars:
-    flist = extract_shadoz_tar(fpath)
+db = os.path.join(ROOT, "data.sqlite")
+
+for fpath in archives:
+    flist = extract_archive(fpath)
     for fh in flist:
-        df = extract_shadoz_sfco3_file(fpath=fh)
-        res = append_to_sqlite_db(df, db, tbl=f"{source}_{file_type}")
+        df = extract_shadoz_file(fpath=fh, remove_file=True)
+        res = append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
         print(res)
 
+# %% sonde data NRB
+# download data from SHADOZ repository
+FILE_TYPE="V06"
 
-# %% 
-# SHADOZ sonde data NRB
-file_type="V06"
+begin_date = datetime(1998, 1, 1)
+end_date = datetime(2022, 6, 30)
+base_url = f"{ROOT_URL}/{SOURCE}/{FILE_TYPE.upper()}/{STATION}/"
+target_dir = os.path.join(ROOT, SOURCE, FILE_TYPE)
+os.makedirs(target_dir, exist_ok=True)
 
+archives = []
+for root, dnames, fnames in os.walk(target_dir):
+    for fname in fnames:
+        archives.append(os.path.join(root, fname))
+
+if not archives:
+    archives = download_archives(base_url, target_dir, \
+        begin_date, end_date=end_date, file_type=FILE_TYPE)
+
+# %%
+# process zip archives, add data to sqlite db
+db = os.path.join(ROOT, "data.sqlite")
+for fpath in archives:
+    flist = extract_archive(fpath)
+    for fh in flist:
+        df = extract_shadoz_file(fpath=fh, remove_file=True)
+        res = append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
+        print(res)
 
 # %%
