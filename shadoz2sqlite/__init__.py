@@ -218,7 +218,7 @@ if not archives:
 
 # %%
 # process zip archives, add data to sqlite db
-db = os.path.join(ROOT, "data.sqlite")
+db = os.path.join(ROOT, "nrb.sqlite")
 for fpath in archives:
     flist = extract_archive(fpath)
     for fh in flist:

@@ -190,7 +190,10 @@ def main():
 
         if not df.empty:
             # create sqlite3 connection
-            con = sqlite3.connect(os.path.join(root, 'data.sqlite'))
+            if 'KEMKN' in station:
+                con = sqlite3.connect(os.path.join(root, 'mkn.sqlite'))
+            else:
+                con = sqlite3.connect(os.path.join(root, 'nrb.sqlite'))
 
             # upload to sqlite db
             # tmp['mappings'].to_sql(name='mappings_%s' % os.path.basename(dpath), con=con, if_exists='replace')

@@ -73,13 +73,13 @@ def main():
     root = os.path.expanduser('~/Documents/git/scratch/data')
     source = "ebas"
     # create sqlite3 connection
-    con = sqlite3.connect(os.path.join(root, 'data.sqlite'))
+    con = sqlite3.connect(os.path.join(root, 'mkn.sqlite'))
 
     for dpath, dnames, fnames in os.walk(os.path.join(root, source)):
         df = pd.DataFrame()
         long_names = []
         for fname in fnames:
-            if (not 'data.pkl' in fname) and (not 'data.sqlite' in fname):
+            if (not 'data.pkl' in fname) and (not 'mkn.sqlite' in fname):
                 print(dpath, dnames, fname)
                 file = os.path.join(dpath, fname)
                 tmp = extract_nasa_ames_file(file=file)

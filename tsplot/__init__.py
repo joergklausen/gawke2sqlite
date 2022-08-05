@@ -14,7 +14,7 @@ __version__ = '0.0.1'
 LOGGER = logging.getLogger(__name__)
 
 # %%
-db = "C:/Users/localadmin/Documents/git/scratch/data/data.sqlite"
+db = "C:/Users/localadmin/Documents/git/scratch/data/nrb.sqlite"
 tbl = "shadoz_V06"
 fields = ["Press", "GeopAlt", "O3_ppmv", "O3_DU"]
 dtm = ["1998-01-01", "2022-12-31"]
