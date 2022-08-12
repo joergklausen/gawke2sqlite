@@ -18,7 +18,7 @@
 # %%
 import matplotlib as plt
 
-import ebas2sqlite
+import ebas2df
 
 # %%
 def plot_df(df, title, yaxs=None, ylabs=None, path=None):

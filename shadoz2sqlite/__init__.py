@@ -4,7 +4,7 @@
 import os
 from datetime import datetime
 import zipfile
-import sqlite3
+import df2sqlite
 import tarfile
 from dateutil. relativedelta import relativedelta
 import pandas as pd
@@ -120,52 +120,11 @@ def extract_shadoz_file(fpath: str, remove_file=False) -> pd.DataFrame:
 
 
 # %%
-def append_to_sqlite_db(df: pd.DataFrame, db: str, tbl: str, remove_duplicates=True) -> dict:
-    try:
-        if df.empty:
-            raise ValueError("DataFrame is empty.")
-
-        records_for_insert = len(df)
-
-        con = sqlite3.connect(db)
-
-        qry_count_records = f"SELECT count({df.index.name}) from {tbl}"
-        try:
-            records_before_insert = con.execute(qry_count_records).fetchone()[0]
-        except:
-            # table does not exist yet
-            records_before_insert = 0
-
-        print(f"Inserting {records_for_insert} rows to {db}[{tbl}] ...")
-        df.to_sql(name=tbl, con=con, if_exists="append", )
-        records_after_insert = con.execute(qry_count_records).fetchone()[0]
-
-        if (records_after_insert - records_before_insert) < records_for_insert:
-            raise Warning("Could not insert all values.")
-
-        if remove_duplicates:
-            group_by = ", ".join(list(df.index.names) + list(df.columns))
-            qry = f"DELETE FROM {tbl} WHERE ROWID NOT IN (SELECT min(ROWID) \
-                FROM {tbl} GROUP BY {group_by})"
-            con.execute(qry)
-            con.commit()
-            records_after_deduplication = con.execute(qry_count_records).fetchone()[0]
-
-        con.close()
-
-        res = {"records_inserted": records_for_insert, \
-            "duplicate_records": records_after_insert - records_after_deduplication}
-
-        return res
-    except Exception as err:
-        print(err)
-
-
-# %%
 ROOT_URL = "https://acd-ext.gsfc.nasa.gov/anonftp/acd"
 SOURCE = "shadoz"
 STATION = "nairobi"
-ROOT = os.path.expanduser("~/Documents/git/scratch/data")
+GAWID = "nrb"
+ROOT = os.path.expanduser("~/Documents/data")
 
 # %% Surface ozone data NRB
 # download data from SHADOZ repository
@@ -188,13 +147,13 @@ if not archives:
 
 # %%
 # process tar archives, add data to sqlite db
-db = os.path.join(ROOT, "data.sqlite")
+db = os.path.join(ROOT, f"{GAWID}.sqlite")
 
 for fpath in archives:
     flist = extract_archive(fpath)
     for fh in flist:
         df = extract_shadoz_file(fpath=fh, remove_file=True)
-        res = append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
+        res = df2sqlite.append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
         print(res)
 
 # %% sonde data NRB
@@ -218,12 +177,12 @@ if not archives:
 
 # %%
 # process zip archives, add data to sqlite db
-db = os.path.join(ROOT, "nrb.sqlite")
+db = os.path.join(ROOT, f"{GAWID}.sqlite")
 for fpath in archives:
     flist = extract_archive(fpath)
     for fh in flist:
         df = extract_shadoz_file(fpath=fh, remove_file=True)
-        res = append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
+        res = df2sqlite.append_to_sqlite_db(df, db, tbl=f"{SOURCE}_{FILE_TYPE}")
         print(res)
 
 # %%
