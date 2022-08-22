@@ -39,9 +39,8 @@ def df2sqlite(df: pd.DataFrame, db, tbl, if_exists="append", index="dtm", remove
 
             # remove duplicates
             if len(res) > 0:
-                qry = "delete from %s where rowid not in ( " % tbl
-                qry += "select min(rowid) from %s " % tbl
-                qry += "group by %s )" % ",".join(names)
+                qry = f"delete from {tbl} where rowid not in ( "
+                qry += f"select min(rowid) from {tbl} group by {','.join(names)} )"
                 cursor.execute(qry)
                 con.commit()
 

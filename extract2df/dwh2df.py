@@ -9,7 +9,7 @@ import time
 import requests
 import pandas as pd
 
-from sourcing import utils
+from extract2df import utils
 
 # %%
 def get_config(station: str):
@@ -64,7 +64,7 @@ def jretrieve_data(station, cfg=None, par_short_names=None, category=None, durat
     """
     try:
         # base_url = 'http://wlsprod.meteoswiss.ch:9010/jretrievedwh/surface?delimiter=,&placeholder=None'
-        base_url = 'http://wlsdevt.meteoswiss.ch:9010/jretrievedwh/surface?delimiter=,&placeholder=None'
+        base_url = 'http://wlsdepl.meteoswiss.ch:9010/jretrievedwh/surface?delimiter=,&placeholder=None'
         base_url += f"&locationIds={station}"
 
         urls = []
@@ -150,20 +150,34 @@ def jretrieve_data(station, cfg=None, par_short_names=None, category=None, durat
 
 
 # %%
-def dwh2df(station: str, path=None, labels=None) -> dict:
+def climap2df(path: str) -> dict:
+    try:
+        if ".dat" in path:
+            # path ="C:/Users/localadmin/Documents/git/gawke2sqlite/data/KEMKN2020.dat"
+            with open(path, 'r', encoding='ascii') as fh:
+                data = fh.readlines()
+    except Exception as err:
+        print(err)
+
+
+# %%
+def dwh2df(station=None, path=None, labels=None) -> dict:
     try:
         if path:
             # try to load data from file
-            file = os.path.join(path, f"{station}.csv")
-            df = pd.read_csv(file, na_values='None', parse_dates=['termin'], index_col=['termin'])
+            if ".csv" in path:
+                df = pd.read_csv(path, na_values='None', parse_dates=['termin'], index_col=['termin'])
+            elif ".dat" in path:
+                df = pd.read_csv(path, na_values='None', parse_dates=['termin'], index_col=['termin'])
             df.index.rename('dtm', inplace=True)
             df.drop(columns='station', inplace=True)
             df = utils.downcast_dataframe(df)    
             X = {'data': df, 'labels': labels}
-        else:
+        elif station:
             cfg = get_config(station)
             X = jretrieve_data(station=station, par_short_names=",".join(cfg['par_short_names'].keys()), category=cfg['category'], since=cfg['since'])
-
+        else:
+            raise ValueError("One of 'station' or 'path' must be specified.")
         if labels:
             return X
         else:

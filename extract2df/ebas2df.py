@@ -6,7 +6,7 @@ from datetime import datetime
 import itertools
 import nappy
 import pandas as pd
-from sourcing import utils
+from extract2df import utils
 
 # %%
 # extract name, unit, statistic from long_names
