@@ -1,4 +1,5 @@
 
+import pandas as pd
 
 # %%
 def df2vrxa00(df: pd.DataFrame, dwh_station_id: int, target: str):

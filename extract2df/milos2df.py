@@ -79,7 +79,7 @@ def extract_o3(df: pd.DataFrame, index=None, o3=None, aggregate=None) -> pd.Data
         if index is None:
             index = "dtm"
         if o3 is None:
-            or = "itosurs0"
+            o3 = "itosurs0"
         
         df.reset_index(inplace=True)
         df = df.loc[:, [index, o3]]

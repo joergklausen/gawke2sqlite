@@ -6,10 +6,11 @@ from extract2df import bulletin2df
 from extract2df import dwh2df
 from extract2df import ebas2df
 from extract2df import milos2df
-from extract2df import utils
+# from extract2df import utils
 from convert import milos2vrxa00
-from df2sqlite import df2sqlite
+# from df2sqlite import df2sqlite
 
+from jklutils import mchfilebrowser, df2sqlite
 
 # %%
 # download data from DWH or load from file
@@ -71,7 +72,7 @@ def process_meteo_bulletins():
     # Download and rename all existing VMSW43 bulletins from MKN
     for url in URLS:
         # process bulletins with old names
-        files = utils.get_urls_from_filebrowser(url=url, pattern=rf">({OLD_NAMES}.+.[zip|001])<")
+        files = mchfilebrowser.get_urls_from_filebrowser(url=url, pattern=rf">({OLD_NAMES}.+.[zip|001])<")
         msg = 'Downloading and extracting files from %s ...' % url
         print(msg)
 
@@ -83,7 +84,7 @@ def process_meteo_bulletins():
             cnt += 1
 
         # process bulletins with new names
-        files = utils.get_urls_from_filebrowser(url=url, pattern=rf">({NEW_NAMES}.+.[zip|001])<")
+        files = mchfilebrowser.get_urls_from_filebrowser(url=url, pattern=rf">({NEW_NAMES}.+.[zip|001])<")
         msg = 'Downloading and extracting files from %s ...' % url
         print(msg)
 
@@ -125,3 +126,10 @@ def process_milos_files():
 # download_from_dwh
 # download_from_ebas
 # process_meteo_bulletins
+ROOT = os.path.expanduser('~/Documents/data')
+GAWID = 'MKN'
+DWH = 'KEMKN'
+cfg = dwh2df.get_config(DWH)
+
+df = dwh2df.dwh2df(cfg=cfg, station=DWH, since='202209010000')
+res = df2sqlite.df2sqlite(df, db=os.path.join(ROOT, "".join([GAWID, ".sqlite"])), tbl=f"dwh_{DWH}")

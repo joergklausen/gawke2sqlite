@@ -7,7 +7,7 @@ from io import BytesIO
 import re
 import requests
 import zipfile
-from extract2df import utils
+from jklutils import utils
 
 # %%
 def extract_bulletin_file(file: str, pattern: str, replace=None, target=None, verbose=True) -> pd.DataFrame:

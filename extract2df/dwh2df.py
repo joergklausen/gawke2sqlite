@@ -9,35 +9,36 @@ import time
 import requests
 import pandas as pd
 
-from extract2df import utils
+# from extract2df import utils
+from jklutils import downcast
 
 # %%
 def get_config(station: str):
-    if station == 'KENAI':
-        par_short_names = {'prestas0': 'Luftdruck auf Barometerhöhe (QFE); Momentanwert (hPa 90)',
-        'tre200s0':	'Lufttemperatur 2 m über Boden; Momentanwert (°C 91)',
-        'rre150z0': 'Niederschlag; Zehnminutensumme (mm 93)',
-        'fkl010z1': 'Böenspitze (Sekundenböe); Maximum (m/s 101)',
-        'fkl010z0': 'Windgeschwindigkeit skalar; Zehnminutenmittel (m/s 196)',
-        'dkl010z0': 'Windrichtung; Zehnminutenmittel (° 197)',
-        'uor200s0': 'Original Luftfeuchtigkeit 2 m über Boden; Momentanwert (% 321)',
-        'itosurr0': 'Bodenozon; 5 Minutenmittel (ppb 7600)',
-        'ycoml1s0': 'Data linux deliver (y/n 7898)',
-        'ycomirs0': 'iridum data deliver (y/n 7591)'}
+    if station in ['KENAI', 'NRB']:
+        par_short_names = {'prestas0': [1, 'Luftdruck auf Barometerhöhe (QFE); Momentanwert (hPa 90)'],
+        'tre200s0':	['Lufttemperatur 2 m über Boden; Momentanwert (°C 91)'],
+        'rre150z0': ['Niederschlag; Zehnminutensumme (mm 93)'],
+        'fkl010z1': ['Böenspitze (Sekundenböe); Maximum (m/s 101)'],
+        'fkl010z0': ['Windgeschwindigkeit skalar; Zehnminutenmittel (m/s 196)'],
+        'dkl010z0': ['Windrichtung; Zehnminutenmittel (° 197)'],
+        'uor200s0': ['Original Luftfeuchtigkeit 2 m über Boden; Momentanwert (% 321)'],
+        'itosurr0': ['Bodenozon; 5 Minutenmittel (ppb 7600)'],
+        'ycoml1s0': ['Data linux deliver (y/n 7898)'],
+        'ycomirs0': ['iridum data deliver (y/n 7591)']}
         category = 1
         since = '20170330000000'
         # since = '20220330000000'
-    if station == 'KEMKN':
-        par_short_names = {'prestas0':	'Luftdruck auf Barometerhöhe (QFE); Momentanwert (hPa 90)',
-        'tre200s0':	'Lufttemperatur 2 m über Boden; Momentanwert (°C 91)',
-        'rre150z0': 'Niederschlag; Zehnminutensumme (mm 93)',
-        'fkl010z1': 'Böenspitze (Sekundenböe); Maximum (m/s 101)',
-        'ua2200s0': 'Vergleichsfeuchtigkeit 2 (% 118)',
-        'ta1200s0': 'Vergleichstemperatur 1; z.T. Wetterhütte (°C 164)',
-        'ta2200s0': 'Vergleichstemperatur 2; u.a. Temp. Hygrometer (°C 165)',
-        'ra1150z0': 'Niederschlagssumme Vergleichsmessung automatisch (mm 178)',
-        'ua1200s0': 'Vergleichsfeuchtigkeit 1; z.T. Wetterhütte (% 181)',
-        'fkl010z0': 'Windgeschwindigkeit skalar; Zehnminutenmittel (m/s 196)',
+    if station in ['KEMKN', 'MKN']:
+        par_short_names = {'prestas0':	['Luftdruck auf Barometerhöhe (QFE); Momentanwert (hPa 90)'],
+        'tre200s0':	['Lufttemperatur 2 m über Boden; Momentanwert (°C 91)'],
+        'rre150z0': ['Niederschlag; Zehnminutensumme (mm 93)'],
+        'fkl010z1': ['Böenspitze (Sekundenböe); Maximum (m/s 101)'],
+        'ua2200s0': ['Vergleichsfeuchtigkeit 2 (% 118)'],
+        'ta1200s0': ['Vergleichstemperatur 1; z.T. Wetterhütte (°C 164)'],
+        'ta2200s0': ['Vergleichstemperatur 2; u.a. Temp. Hygrometer (°C 165)'],
+        'ra1150z0': ['Niederschlagssumme Vergleichsmessung automatisch (mm 178)'],
+        'ua1200s0': ['Vergleichsfeuchtigkeit 1; z.T. Wetterhütte (% 181)'],
+        'fkl010z0': ['Windgeschwindigkeit skalar; Zehnminutenmittel (m/s 196)'],
         'dkl010z0': 'Windrichtung; Zehnminutenmittel (° 197)',
         'gor000z0': 'Original Globalstrahlung; Zehnminutenmittel (W/m2 285)',
         'uor200s0': 'Original Luftfeuchtigkeit 2 m über Boden; Momentanwert (% 321)',
@@ -77,37 +78,40 @@ def jretrieve_data(station, cfg=None, par_short_names=None, category=None, durat
                 raise Exception('"category" not specified.')
             if duration is None:
                 if since is None:
-                #     raise('Either "duration" or "since" must be specified.')
-                # else:
+                    raise('Either "duration" or "since" must be specified.')
+            else:
+                if since is None:
                     since = (datetime.datetime.now() - datetime.timedelta(days=duration)).strftime("%Y%m%d%H%M%S")
+                if till is None:
+                    till = time.strftime("%Y%m%d%H%M%S")
+                if since > till:
+                    base_url += f"&date={till}-{since}"
+            base_url += f"&date={since}-{till}"
+            base_url += f"&parameterShortNames={par_short_names}"
+            base_url += f"&measCatNr={category}"
+            urls.append(base_url)
+            series = par_short_names.split(sep=',')
+            labels = dict(zip(series, series))
+        else:
+            if since is None:
+                if duration:
+                    since = (datetime.datetime.now() - datetime.timedelta(days=duration)).strftime("%Y%m%d%H%M%S")
+                else:
+                    since = cfg[station]['since']
+            if till is None:
                 till = time.strftime("%Y%m%d%H%M%S")
-                base_url += f"&date={since}-{till}"
-                base_url += f"&parameterShortNames={par_short_names}"
-                base_url += f"&measCatNr={category}"
-                urls.append(base_url)
-                series = par_short_names.split(sep=',')
-                labels = dict(zip(series, series))
-        # else:
-        #     if since is None:
-        #         if duration:
-        #             since = (datetime.datetime.now() - datetime.timedelta(days=duration)).strftime("%Y%m%d%H%M%S")
-        #         else:
-        #             since = cfg[station]['since']
-        #     if till is None:
-        #         till = time.strftime("%Y%m%d%H%M%S")
-        #     base_url += "&date=%s-%s" % (since, till)
+            base_url += "&date=%s-%s" % (since, till)
 
-        #     params = cfg[station]['params']
+            params = cfg['par_short_names']
 
-        #     series = []
-        #     labels = []
-        #     for key in params.keys():
-        #         url = base_url + "&parameterShortNames=%s" % params[key]['var']
-        #         url += "&measCatNr=%s" % str(params[key]['cat'])
-        #         urls.append(url)
-        #         series.append(key)
-        #         labels.append("%s (%s)" % (params[key]['lbl'], params[key]['var']))
-        #     labels = dict(zip(series, labels))
+            # series = []
+            # labels = []
+            url = base_url + f"&parameterShortNames={','.join(params.keys())}"
+            url += "&measCatNr=%s" % str(cfg['category'])
+            urls.append(url)
+            # series.append(key)
+            # labels.append("%s (%s)" % (params[key]['lbl'], params[key]['var']))
+            labels = params
 
         for url in urls:
             print(f"Calling {url} ...")
@@ -138,7 +142,7 @@ def jretrieve_data(station, cfg=None, par_short_names=None, category=None, durat
             df.columns = series
 
             ## downcast data to reduce size of dataframe
-            df = utils.downcast_dataframe(df)
+            df = downcast.downcast_dataframe(df)
 
             # make sure df is sorted by date
             df.sort_index(inplace=True)
@@ -161,7 +165,7 @@ def climap2df(path: str) -> dict:
 
 
 # %%
-def dwh2df(station=None, path=None, labels=None) -> dict:
+def dwh2df(cfg, station=None, path=None, labels=None, since=None, till=None) -> dict:
     try:
         if path:
             # try to load data from file
@@ -171,11 +175,12 @@ def dwh2df(station=None, path=None, labels=None) -> dict:
                 df = pd.read_csv(path, na_values='None', parse_dates=['termin'], index_col=['termin'])
             df.index.rename('dtm', inplace=True)
             df.drop(columns='station', inplace=True)
-            df = utils.downcast_dataframe(df)    
+            df = downcast.downcast_dataframe(df)    
             X = {'data': df, 'labels': labels}
         elif station:
-            cfg = get_config(station)
-            X = jretrieve_data(station=station, par_short_names=",".join(cfg['par_short_names'].keys()), category=cfg['category'], since=cfg['since'])
+            if since is None:
+                since = cfg['since']
+            X = jretrieve_data(station=station, cfg=cfg, par_short_names=",".join(cfg['par_short_names'].keys()), category=cfg['category'], since=since, till=till)
         else:
             raise ValueError("One of 'station' or 'path' must be specified.")
         if labels:
